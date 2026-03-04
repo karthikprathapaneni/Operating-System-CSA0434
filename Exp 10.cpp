@@ -1,107 +1,50 @@
 #include <stdio.h>
-
-void firstFit(int blockSize[], int m, int processSize[], int n) {
-    int allocation[n];
-
-    for (int i = 0; i < n; i++)
-        allocation[i] = -1;
-
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < m; j++) {
-            if (blockSize[j] >= processSize[i]) {
-                allocation[i] = j;
-                blockSize[j] -= processSize[i];
-                break;
-            }
-        }
-    }
-
-    printf("\nFirst Fit Allocation:\n");
-    for (int i = 0; i < n; i++)
-        printf("P%d -> %s\n", i + 1,
-               (allocation[i] != -1 ? "Allocated" : "Not Allocated"));
-}
-
-void bestFit(int blockSize[], int m, int processSize[], int n) {
-    int allocation[n];
-
-    for (int i = 0; i < n; i++)
-        allocation[i] = -1;
-
-    for (int i = 0; i < n; i++) {
-        int best = -1;
-
-        for (int j = 0; j < m; j++) {
-            if (blockSize[j] >= processSize[i]) {
-                if (best == -1 || blockSize[j] < blockSize[best])
-                    best = j;
-            }
-        }
-
-        if (best != -1) {
-            allocation[i] = best;
-            blockSize[best] -= processSize[i];
-        }
-    }
-
-    printf("\nBest Fit Allocation:\n");
-    for (int i = 0; i < n; i++)
-        printf("P%d -> %s\n", i + 1,
-               (allocation[i] != -1 ? "Allocated" : "Not Allocated"));
-}
-
-void worstFit(int blockSize[], int m, int processSize[], int n) {
-    int allocation[n];
-
-    for (int i = 0; i < n; i++)
-        allocation[i] = -1;
-
-    for (int i = 0; i < n; i++) {
-        int worst = -1;
-
-        for (int j = 0; j < m; j++) {
-            if (blockSize[j] >= processSize[i]) {
-                if (worst == -1 || blockSize[j] > blockSize[worst])
-                    worst = j;
-            }
-        }
-
-        if (worst != -1) {
-            allocation[i] = worst;
-            blockSize[worst] -= processSize[i];
-        }
-    }
-
-    printf("\nWorst Fit Allocation:\n");
-    for (int i = 0; i < n; i++)
-        printf("P%d -> %s\n", i + 1,
-               (allocation[i] != -1 ? "Allocated" : "Not Allocated"));
-}
+#include <windows.h>
 
 int main() {
-    int m, n;
+    HANDLE hMapFile;
+    LPCTSTR pBuf;
+    const char* message = "Hello from Windows Message Queue IPC!";
 
-    printf("Enter number of memory blocks: ");
-    scanf("%d", &m);
+    // Create a shared memory block
+    hMapFile = CreateFileMapping(
+        INVALID_HANDLE_VALUE,   // Use system paging file
+        NULL,                   // Default security
+        PAGE_READWRITE,         // Read/write access
+        0,
+        1024,                   // Size in bytes
+        "MyMessageQueue"        // Name of shared memory
+    );
 
-    int blockSize[m], blockCopy1[m], blockCopy2[m];
-    printf("Enter block sizes:\n");
-    for (int i = 0; i < m; i++) {
-        scanf("%d", &blockSize[i]);
-        blockCopy1[i] = blockCopy2[i] = blockSize[i];
+    if (hMapFile == NULL) {
+        printf("Could not create file mapping object (%d).\n", GetLastError());
+        return 1;
     }
 
-    printf("Enter number of processes: ");
-    scanf("%d", &n);
+    // Map memory to our process address space
+    pBuf = (LPTSTR) MapViewOfFile(
+        hMapFile,
+        FILE_MAP_ALL_ACCESS,
+        0,
+        0,
+        1024
+    );
 
-    int processSize[n];
-    printf("Enter process sizes:\n");
-    for (int i = 0; i < n; i++)
-        scanf("%d", &processSize[i]);
+    if (pBuf == NULL) {
+        printf("Could not map view of file (%d).\n", GetLastError());
+        CloseHandle(hMapFile);
+        return 1;
+    }
 
-    firstFit(blockSize, m, processSize, n);
-    bestFit(blockCopy1, m, processSize, n);
-    worstFit(blockCopy2, m, processSize, n);
+    // Write a message
+    sprintf((char*)pBuf, "%s", message);
+    printf("Message sent: %s\n", (char*)pBuf);
+
+    printf("\nSender finished. Press Enter to exit...");
+    getchar();
+
+    UnmapViewOfFile(pBuf);
+    CloseHandle(hMapFile);
 
     return 0;
 }
